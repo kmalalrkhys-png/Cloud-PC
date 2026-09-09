@@ -12,14 +12,30 @@ jobs:
           Stop-Service wuauserv -ErrorAction SilentlyContinue
           Set-Service wuauserv -StartupType Disabled
 
-      - name: Install Tailscale
+      - name: Force Full CPU Cores & Hardware Detection
         run: |
-          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "tailscale-setup.exe"
-          Start-Process -FilePath "tailscale-setup.exe" -ArgumentList "/verysilent /norestart" -Wait
+          bcdedit /set detecthal on
+          bcdedit /set numa enable
 
-      - name: Connect Tailscale
+      - name: Install Tailscale via Winget
+        run: |
+          winget install --id Tailscale.Tailscale -e --silent --accept-package-agreements --accept-source-agreements
+
+      - name: Connect Tailscale using Auth Key
         run: |
           & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --unattended
+
+      - name: Display Tailscale IP Address
+        run: |
+          $tsip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          Write-Host "=========================================="
+          Write-Host " Tailscale IP Address: $tsip"
+          Write-Host " Use this IP in your RDP client app."
+          Write-Host "=========================================="
+
+      - name: Set Password for RunnerAdmin
+        run: |
+          net user runneradmin CloudPC123!
 
       - name: Enable Secure Single User RDP
         run: |
