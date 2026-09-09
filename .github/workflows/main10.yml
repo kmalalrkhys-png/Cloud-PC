@@ -1,0 +1,35 @@
+name: Tailscale Private Cloud PC
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    steps:
+      - name: Disable Unnecessary Background Services
+        run: |
+          Stop-Service wuauserv -ErrorAction SilentlyContinue
+          Set-Service wuauserv -StartupType Disabled
+
+      - name: Install Tailscale via Winget
+        run: |
+          winget install --id Tailscale.Tailscale -e --silent --accept-package-agreements --accept-source-agreements
+
+      - name: Connect Tailscale using Auth Key
+        run: |
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --unattended
+
+      - name: Set Password for RunnerAdmin
+        run: |
+          net user runneradmin CloudPC123!
+
+      - name: Enable Secure Single User RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "MaxInstanceCount" -Value 1
+
+      - name: Keep Alive Session
+        run: |
+          Do { Start-Sleep -Seconds 15 } While ($true)
