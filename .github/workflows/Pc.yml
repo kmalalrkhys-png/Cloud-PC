@@ -1,4 +1,4 @@
-name: Tailscale Private Cloud PC
+name: Tailscale Private Cloud PC with Google Drive
 
 on: workflow_dispatch
 
@@ -12,14 +12,25 @@ jobs:
           Stop-Service wuauserv -ErrorAction SilentlyContinue
           Set-Service wuauserv -StartupType Disabled
 
-      - name: Install Tailscale
+      - name: Install Tailscale via Winget
         run: |
-          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "tailscale-setup.exe"
-          Start-Process -FilePath "tailscale-setup.exe" -ArgumentList "/verysilent /norestart" -Wait
+          winget install --id Tailscale.Tailscale -e --silent --accept-package-agreements --accept-source-agreements
 
-      - name: Connect Tailscale
+      - name: Connect Tailscale using Auth Key
         run: |
           & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --unattended
+
+      - name: Display Tailscale IP Address
+        run: |
+          $tsip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          Write-Host "=========================================="
+          Write-Host " Tailscale IP Address: $tsip"
+          Write-Host " Use this IP in your RDP client app."
+          Write-Host "=========================================="
+
+      - name: Set Password for RunnerAdmin
+        run: |
+          net user runneradmin CloudPC123!
 
       - name: Enable Secure Single User RDP
         run: |
@@ -27,6 +38,20 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "MaxInstanceCount" -Value 1
 
-      - name: Keep Alive Session
+      - name: Setup Rclone for Google Drive Backup
         run: |
-          Do { Start-Sleep -Seconds 15 } While ($true)
+          winget install --id Rclone.Rclone -e --silent
+          # إنشاء مجلد إعدادات ركلون ووضع النص السرّي المخزن في غيت هب
+          mkdir "$env:APPDATA\rclone" -ErrorAction SilentlyContinue
+          Set-Content -Path "$env:APPDATA\rclone\rclone.conf" -Value '${{ secrets.RCLONE_CONFIG }}'
+
+      - name: Keep Alive and Periodic Sync to Google Drive
+        run: |
+          Write-Host "Cloud PC is running. Files in C:\Backup will be synced to Google Drive every 10 minutes..."
+          mkdir "C:\Backup" -ErrorAction SilentlyContinue
+          
+          Do {
+            Start-Sleep -Seconds 600
+            # أمر مزامنة المجلد المحلي تلقائياً إلى غوغل درايف (باسم gdrive وبالفولدر MyCloud)
+            & "rclone" sync "C:\Backup" "gdrive:MyCloud" --fast-list
+          } While ($true)
