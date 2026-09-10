@@ -9,41 +9,35 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Configure Core RDP Settings
+      - name: Configure Core RDP and Easy Password
         run: |
-          # Enable Remote Desktop and allow connection with default user
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
-                               -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
-                               -Name "UserAuthentication" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
-                               -Name "SecurityLayer" -Value 0 -Force
+          # Enable Remote Desktop
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
 
-          # Remove any existing rule with the same name to avoid duplication
+          # Set an easy password for the current runner user (runneradmin)
+          $currentUser = $env:USERNAME
+          net user $currentUser "Password123"
+
+          # Open Firewall for RDP
           netsh advfirewall firewall delete rule name="RDP-Tailscale"
-          
-          # Allow incoming connection on port 3389
-          netsh advfirewall firewall add rule name="RDP-Tailscale" `
-            dir=in action=allow protocol=TCP localport=3389
+          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
 
-          # Restart the Remote Desktop service to ensure changes take effect
           Restart-Service -Name TermService -Force
 
       - name: Install Tailscale
         run: |
           $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
           $installerPath = "$env:TEMP\tailscale.msi"
-          
           Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
           Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
           Remove-Item $installerPath -Force
 
       - name: Establish Tailscale Connection
         run: |
-          # Bring up Tailscale with the provided auth key from GitHub Secrets
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
           
-          # Wait for Tailscale to assign an IP
           $tsIP = $null
           $retries = 0
           while (-not $tsIP -and $retries -lt 15) {
@@ -53,7 +47,7 @@ jobs:
           }
           
           if (-not $tsIP) {
-              Write-Error "Tailscale IP not assigned. Please check if your Auth Key in Secrets is valid."
+              Write-Error "Tailscale IP not assigned."
               exit 1
           }
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
@@ -61,16 +55,16 @@ jobs:
       - name: Setup Local Backup Folder
         run: |
           New-Item -ItemType Directory -Force -Path "C:\MyBackupFolder"
-          Set-Content -Path "C:\MyBackupFolder\readme.txt" -Value "ضع هنا أي ملفات تريد الاحتفاظ بها، وسيتم رفعها تلقائياً عند انتهاء الجلسة أو توقفها."
+          Set-Content -Path "C:\MyBackupFolder\readme.txt" -Value "ضع هنا ملفاتك وسيتم رفعها تلقائياً عند انتهاء الجلسة."
 
-      - name: Maintain Connection & Show Access Details
+      - name: Maintain Connection & Show Details
         run: |
           Write-Host "`n=== RDP ACCESS DETAILS ==="
-          Write-Host "Tailscale IP Address: $env:TAILSCALE_IP"
-          Write-Host "Login using the default runner credentials or your connected session."
+          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
+          Write-Host "Username: $env:USERNAME"
+          Write-Host "Password: Password123"
           Write-Host "==========================`n"
           
-          # Keep runner active so you can connect
           while ($true) {
               Write-Host "[$(Get-Date)] RDP Session is Active..."
               Start-Sleep -Seconds 300
@@ -83,4 +77,3 @@ jobs:
           name: windows-session-backup-${{ github.run_id }}
           path: C:\MyBackupFolder
           if-no-files-found: ignore
-          
