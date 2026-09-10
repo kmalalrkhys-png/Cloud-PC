@@ -12,11 +12,6 @@ jobs:
           Stop-Service wuauserv -ErrorAction SilentlyContinue
           Set-Service wuauserv -StartupType Disabled
 
-      - name: Force Full CPU Cores & Hardware Detection
-        run: |
-          bcdedit /set detecthal on
-          bcdedit /set numa enable
-
       - name: Install Tailscale via Winget
         run: |
           winget install --id Tailscale.Tailscale -e --silent --accept-package-agreements --accept-source-agreements
