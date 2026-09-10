@@ -55,4 +55,3 @@ jobs:
             # أمر مزامنة المجلد المحلي تلقائياً إلى غوغل درايف (باسم gdrive وبالفولدر MyCloud)
             & "rclone" sync "C:\Backup" "gdrive:MyCloud" --fast-list
           } While ($true)
-          
