@@ -20,16 +20,14 @@ jobs:
     - name: إعداد محول الويب (noVNC)
       run: |
         git clone https://github.com/novnc/noVNC.git
-        git clone https://github.com/novnc/websockify.git
-        pip install numpy
-        Start-Process -NoNewWindow -FilePath "python" -ArgumentList ".\websockify\websockify.py", "6080", "127.0.0.1:5900", "--web", ".\noVNC"
+        pip install numpy websockify
+        Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:5900", "--web", ".\noVNC"
 
     - name: تشغيل النفق واستخراج الرابط
       run: |
         Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
         Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url http://localhost:6080" -RedirectStandardError "cf_log.txt" -NoNewWindow
         
-        # زيادة وقت الانتظار لضمان عمل خوادم noVNC و Cloudflare معاً بدون أخطاء DNS
         Start-Sleep -Seconds 25
         
         $url = Select-String -Path "cf_log.txt" -Pattern "https://[a-z0-9-]+\.trycloudflare\.com" | ForEach-Object { $_.Matches.Value }
