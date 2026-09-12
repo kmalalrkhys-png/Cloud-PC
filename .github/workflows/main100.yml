@@ -1,43 +1,45 @@
-name: Windows Web GUI (Cloudflare)
+name: Real Windows KVM on Linux (80GB Disk)
 
 on:
   workflow_dispatch:
 
 jobs:
-  windows-gui:
-    runs-on: windows-latest
+  kvm-windows:
+    runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-    - name: تثبيت خادم VNC السريع
+    - name: إعداد المساحة والذاكرة على القرص الثانوي
       run: |
-        choco install tightvnc -y
-        # ضبط كلمة مرور صامتة لـ VNC لتجاوز شاشة التثبيت
-        New-Item -Path "HKLM:\SOFTWARE\TightVNC\Server" -Force
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\TightVNC\Server" -Name "Password" -Value ([byte[]](0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08))
-        Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-reinstall", "-run"
-        Start-Sleep -Seconds 3
+        sudo apt-get update
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker
+        kvm-ok || true
+        
+        sudo mkdir -p /mnt/d/kvm-disk
+        sudo chown -R $USER:$USER /mnt/d/kvm-disk
 
-    - name: إعداد محول الويب noVNC
+    - name: إنشاء قرص صلب وهمي بسعة 80 جيجابايت على القرص D
       run: |
+        # تخصيص مساحة 80GB بالكامل للقرص الوهمي
+        qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 80G
+
+    - name: تشغيل ويندوز عبر KVM مع تخصيص 2 نواة و 10 جيجابايت RAM
+      run: |
+        nohup kvm -smp 2 -m 10240 -drive file=/mnt/d/kvm-disk/win-hd.qcow2,format=qcow2,if=virtio -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 -vnc :0 -enable-kvm > kvm.log 2>&1 &
+
+    - name: تثبيت وتشغيل محول الويب و Cloudflare Tunnel
+      run: |
+        sudo apt-get install -y python3-pip python3-numpy python3-websockify git
         git clone https://github.com/novnc/noVNC.git
-        pip install numpy websockify
-        Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:5900", "--web", ".\noVNC"
+        
+        nohup python3 ./noVNC/utils/novnc_proxy --vnc localhost:5900 --listen 6080 > novnc.log 2>&1 &
 
-    - name: تشغيل نفق Cloudflare واستخراج الرابط
-      run: |
-        Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
-        Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url http://localhost:6080" -RedirectStandardError "cf_log.txt" -NoNewWindow
+        curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+        chmod +x cloudflared
+        ./cloudflared tunnel --url http://localhost:6080 &
         
-        Start-Sleep -Seconds 12
-        
-        $url = Select-String -Path "cf_log.txt" -Pattern "https://[a-z0-9-]+\.trycloudflare\.com" | ForEach-Object { $_.Matches.Value }
-        
-        Write-Host "=========================================="
-        Write-Host "✅ تم إنشاء الرابط بنجاح!"
-        Write-Host "👉 الرابط هو: $($url)/vnc.html"
-        Write-Host "=========================================="
+        sleep 15
 
     - name: إبقاء الجلسة نشطة
       run: |
-        while ($true) { Start-Sleep -Seconds 60 }
+        while true; do sleep 60; done
