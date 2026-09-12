@@ -1,0 +1,27 @@
+name: Windows Cloudflare RDP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: إعداد بيانات الدخول لـ RDP
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+        echo "تم تفعيل الـ RDP بنجاح"
+
+    - name: تثبيت وتشغيل نفق Cloudflare Tunnel
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
+        Start-Process -NoNewWindow -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url rdp://localhost:3389"
+      
+    - name: إبقاء الجلسة مفتوحة
+      run: |
+        Write-Host "الجلسة تعمل الآن عبر نفق Cloudflare..."
+        while ($true) { Start-Sleep -Seconds 30 }
