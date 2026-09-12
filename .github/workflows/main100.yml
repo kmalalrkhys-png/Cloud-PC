@@ -1,10 +1,10 @@
-name: Real Windows KVM with Go-VNC (10GB RAM, 80GB Disk)
+name: Real Windows KVM with Web VNC (10GB RAM, 80GB Disk)
 
 on:
   workflow_dispatch:
 
 jobs:
-  kvm-govnc:
+  kvm-webvnc:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -12,17 +12,22 @@ jobs:
     - name: إعداد القرص الثانوي ومساحة الـ 80GB
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker git golang-go
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker python3-pip git
         kvm-ok || true
         
         sudo mkdir -p /mnt/d/kvm-disk
         sudo chown -R $USER:$USER /mnt/d/kvm-disk
 
-    - name: بناء قرص الويندوز الوهمي (80GB)
+    - name: بناء قرص الويندوز الوهمي (80GB) وتجهيز الواجهة
       run: |
         qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 80G
+        
+        # تحميل واجهة noVNC الرسمية والمستقرة
+        git clone https://github.com/novnc/noVNC.git
+        # إنشاء رابط مباشر لتوجيه الصفحة الرئيسية مباشرة إلى واجهة الاتصال vnc.html
+        ln -s vnc.html noVNC/index.html
 
-    - name: تشغيل نظام KVM بالموارد المحددة
+    - name: تشغيل نظام KVM وجسر الويب عبر websockify
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -33,23 +38,17 @@ jobs:
           -vnc :0 > kvm.log 2>&1 &
         
         sleep 20
-
-    - name: تحميل وتثبيت خادم العرض البديل وتوجيه Cloudflare
-      run: |
-        # استنساخ أداة تعتمد على Go للبث السريع خفيف الموارد
-        git clone https://github.com/maka00/govnc.git
-        cd govnc
-        go mod init govnc || true
-        go get github.com/gorilla/websocket || true
         
-        # تشغيل خادم البث عبر المنفذ 8080 لتجنب مشاكل 502
-        nohup go run main.go socket > govnc.log 2>&1 &
-        cd ..
+        # تثبيت وتشغيل websockify لخدمة ملفات الويب والربط بـ VNC على المنفذ 6080
+        pip3 install websockify
+        nohup websockify --web ./noVNC 6080 localhost:5900 > novnc.log 2>&1 &
 
+    - name: تشغيل Cloudflare Tunnel لتوجيه الرابط
+      run: |
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
         
-        nohup ./cloudflared tunnel --url http://localhost:8080 > cf.log 2>&1 &
+        nohup ./cloudflared tunnel --url http://localhost:6080 > cf.log 2>&1 &
         
         sleep 12
         cat cf.log
