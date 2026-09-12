@@ -1,27 +1,44 @@
-name: Windows Cloudflare RDP
+name: Windows Web GUI (Cloudflare)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  windows-gui:
     runs-on: windows-latest
     timeout-minutes: 360
 
     steps:
-    - name: إعداد بيانات الدخول لـ RDP
+    - name: إعداد خادم الشاشة (TightVNC)
       run: |
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
-        echo "تم تفعيل الـ RDP بنجاح"
+        Invoke-WebRequest -Uri "https://www.tightvnc.com/download/2.8.81/tvnc64-2.8.81-gpl-setup.msi" -OutFile "tvnc.msi"
+        Start-Process msiexec.exe -ArgumentList "/i tvnc.msi /quiet /norestart" -Wait
+        # تعطيل كلمة المرور لتسهيل الدخول من الهاتف
+        New-Item -Path "HKLM:\Software\TightVNC" -Force | Out-Null
+        New-Item -Path "HKLM:\Software\TightVNC\Server" -Force | Out-Null
+        Set-ItemProperty -Path "HKLM:\Software\TightVNC\Server" -Name "UseVncAuthentication" -Value 0
+        Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-run"
 
-    - name: تثبيت وتشغيل نفق Cloudflare Tunnel
+    - name: إعداد محول الويب (noVNC)
+      run: |
+        git clone https://github.com/novnc/noVNC.git
+        git clone https://github.com/novnc/websockify.git
+        pip install numpy
+        Start-Process -NoNewWindow -FilePath "python" -ArgumentList ".\websockify\websockify.py", "6080", "127.0.0.1:5900", "--web", ".\noVNC"
+
+    - name: تشغيل النفق واستخراج الرابط
       run: |
         Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
-        Start-Process -NoNewWindow -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url rdp://localhost:3389"
-      
-    - name: إبقاء الجلسة مفتوحة
+        Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url http://localhost:6080" -RedirectStandardError "cf_log.txt" -NoNewWindow
+        Start-Sleep -Seconds 10
+        $url = Select-String -Path "cf_log.txt" -Pattern "https://[a-z0-9-]+\.trycloudflare\.com" | ForEach-Object { $_.Matches.Value }
+        
+        Write-Host "=========================================="
+        Write-Host "✅ تم الاتصال بنجاح!"
+        Write-Host "👉 افتح هذا الرابط في متصفح هاتفك:"
+        Write-Host "$($url)/vnc.html"
+        Write-Host "=========================================="
+
+    - name: إبقاء الجلسة نشطة
       run: |
-        Write-Host "الجلسة تعمل الآن عبر نفق Cloudflare..."
         while ($true) { Start-Sleep -Seconds 30 }
