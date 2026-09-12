@@ -32,10 +32,9 @@ jobs:
         nohup qemu-system-x86_64 -smp 2 -m 10240 -drive file=/mnt/d/kvm-disk/win-hd.qcow2,format=qcow2,if=virtio -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 -vnc :0 -enable-kvm > kvm.log 2>&1 &
         sleep 20
 
-    - name: تشغيل جسر noVNC بمسار مباشر وتوجيه Cloudflare
+    - name: تشغيل جسر noVNC وتوجيه Cloudflare Tunnel
       run: |
-        # تشغيل websockify بربط مباشر لملفات الويب والمنفذ
-        nohup python3 ./noVNC/utils/novnc_proxy --vnc localhost:5900 --listen 6080 > novnc.log 2>&1 &
+        nohup python3 ./noVNC/utils/launch.py --listen 6080 --vnc localhost:5900 > novnc.log 2>&1 &
         
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
