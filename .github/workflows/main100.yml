@@ -1,4 +1,4 @@
-name: Real Windows KVM on Linux (80GB Disk)
+name: Real Windows KVM on Linux (10GB RAM, 80GB Disk)
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
     - name: إعداد المساحة والذاكرة على القرص الثانوي
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker python3-pip python3-dev git
         kvm-ok || true
         
         sudo mkdir -p /mnt/d/kvm-disk
@@ -20,25 +20,29 @@ jobs:
 
     - name: إنشاء قرص صلب وهمي بسعة 80 جيجابايت على القرص D
       run: |
-        # تخصيص مساحة 80GB بالكامل للقرص الوهمي
         qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 80G
 
-    - name: تشغيل ويندوز عبر KVM مع تخصيص 2 نواة و 10 جيجابايت RAM
+    - name: تثبيت أدوات الويب و websockify
       run: |
-        nohup kvm -smp 2 -m 10240 -drive file=/mnt/d/kvm-disk/win-hd.qcow2,format=qcow2,if=virtio -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 -vnc :0 -enable-kvm > kvm.log 2>&1 &
-
-    - name: تثبيت وتشغيل محول الويب و Cloudflare Tunnel
-      run: |
-        sudo apt-get install -y python3-pip python3-numpy python3-websockify git
+        pip3 install numpy websockify
         git clone https://github.com/novnc/noVNC.git
-        
-        nohup python3 ./noVNC/utils/novnc_proxy --vnc localhost:5900 --listen 6080 > novnc.log 2>&1 &
 
+    - name: تشغيل ويندوز عبر KVM (2 Cores - 10GB RAM)
+      run: |
+        nohup qemu-system-x86_64 -smp 2 -m 10240 -drive file=/mnt/d/kvm-disk/win-hd.qcow2,format=qcow2,if=virtio -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 -vnc :0 -enable-kvm > kvm.log 2>&1 &
+
+    - name: تشغيل جسر noVNC على المنفذ 6080 وتوجيه Cloudflare
+      run: |
+        # تشغيل الجسر بـ python مباشرة لضمان عدم التوقف
+        nohup python3 -m websockify --web ./noVNC 6080 localhost:5900 > novnc.log 2>&1 &
+        
+        # تحميل وتشغيل Cloudflare Tunnel
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
-        ./cloudflared tunnel --url http://localhost:6080 &
+        nohup ./cloudflared tunnel --url http://localhost:6080 > cf.log 2>&1 &
         
-        sleep 15
+        sleep 10
+        cat cf.log
 
     - name: إبقاء الجلسة نشطة
       run: |
