@@ -4,41 +4,44 @@ on:
   workflow_dispatch:
 
 jobs:
-  kvm-windows:
+  windows-kvm:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-    - name: إعداد المساحة والذاكرة على القرص الثانوي
+    - name: إعداد القرص الثانوي ومساحة الـ 80GB
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker python3-pip python3-dev git
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker
         kvm-ok || true
         
         sudo mkdir -p /mnt/d/kvm-disk
         sudo chown -R $USER:$USER /mnt/d/kvm-disk
 
-    - name: إنشاء قرص صلب وهمي بسعة 80 جيجابايت على القرص D
+    - name: بناء قرص الويندوز الوهمي (80GB)
       run: |
         qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 80G
 
-    - name: تثبيت أدوات الويب و websockify
+    - name: تشغيل محاكي KVM مع تخصيص 10GB رام و 2 Cores وتوجيه RDP
       run: |
-        pip3 install numpy websockify
-        git clone https://github.com/novnc/noVNC.git
-
-    - name: تشغيل ويندوز عبر KVM والانتظار لإقلاع الخادم
-      run: |
-        nohup qemu-system-x86_64 -smp 2 -m 10240 -drive file=/mnt/d/kvm-disk/win-hd.qcow2,format=qcow2,if=virtio -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 -vnc :0 -enable-kvm > kvm.log 2>&1 &
-        sleep 20
-
-    - name: تشغيل جسر noVNC وتوجيه Cloudflare Tunnel
-      run: |
-        nohup python3 ./noVNC/utils/launch.py --listen 6080 --vnc localhost:5900 > novnc.log 2>&1 &
+        # ملاحظة: يمكنك وضع رابط ملف ISO لنظام ويندوز لتثبيته، أو تشغيل النظام المباشر
+        nohup qemu-system-x86_64 \
+          -enable-kvm \
+          -smp 2 \
+          -m 10240 \
+          -drive file=/mnt/d/kvm-disk/win-hd.qcow2,format=qcow2,if=virtio \
+          -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
+          -vnc :0 > kvm.log 2>&1 &
         
+        sleep 10
+
+    - name: تشغيل Cloudflare Tunnel لتوجيه منفذ RDP للاتصال المباشر
+      run: |
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
-        nohup ./cloudflared tunnel --url http://localhost:6080 > cf.log 2>&1 &
+        
+        # توجيه بروتوكول RDP مباشرة عبر نفق TCP
+        nohup ./cloudflared tunnel --url rdp://localhost:3389 > cf.log 2>&1 &
         
         sleep 12
         cat cf.log
