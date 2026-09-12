@@ -9,14 +9,13 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: تحميل وتشغيل خادم الشاشة السريع
+    - name: تحميل وتثبيت VNC سريع ومباشر
       run: |
-        # تحميل نسخة خفيفة جداً ومحمولة من VNC لتوفير الوقت
-        Invoke-WebRequest -Uri "https://www.uvnc.com/downloads/uvnc13/1320/UltraVNC_1320_X64.exe" -OutFile "uvnc.exe"
-        Start-Process -FilePath "uvnc.exe" -ArgumentList "/verysilent /norestart" -Wait
+        $installer = "tightvnc.msi"
+        Invoke-WebRequest -Uri "https://www.tightvnc.com/download/2.8.27/tightvnc-2.8.27-gpl-setup-64bit.msi" -OutFile $installer
+        Start-Process msiexec.exe -ArgumentList "/i $installer /quiet /norestart SET_PASSWD=0" -Wait
         
-        # تشغيل الخادم مباشرة بدون انتظار تثبيت معقد
-        Start-Process -FilePath "C:\Program Files\UltraVNC\winvnc.exe" -ArgumentList "-run"
+        Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-run"
         Start-Sleep -Seconds 2
 
     - name: إعداد محول الويب noVNC
@@ -30,8 +29,7 @@ jobs:
         Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
         Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url http://localhost:6080" -RedirectStandardError "cf_log.txt" -NoNewWindow
         
-        # تقليل وقت الانتظار لأن كل شيء يعمل بسرعة البرق الآن
-        Start-Sleep -Seconds 10
+        Start-Sleep -Seconds 12
         
         $url = Select-String -Path "cf_log.txt" -Pattern "https://[a-z0-9-]+\.trycloudflare\.com" | ForEach-Object { $_.Matches.Value }
         
