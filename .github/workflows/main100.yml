@@ -26,7 +26,6 @@ jobs:
 
     - name: تشغيل نظام KVM وجسر الويب عبر بيئة بايثون المعزولة
       run: |
-        # تشغيل QEMU مع تحديد شاشة VNC بدقة على المنفذ المحلّي 5900 (الشاشة رقم 0 تعني 5900)
         nohup qemu-system-x86_64 \
           -enable-kvm \
           -smp 2 \
@@ -35,10 +34,8 @@ jobs:
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -vnc 0.0.0.0:0 > kvm.log 2>&1 &
         
-        # الانتظار حتى يعمل النظام وتستقر الخدمة تماماً
         sleep 25
         
-        # إعداد وتشغيل websockify لربط الواجهة بـ VNC
         python3 -m venv venv
         ./venv/bin/pip install websockify
         
@@ -53,7 +50,13 @@ jobs:
         nohup ./cloudflared tunnel --url http://localhost:6080 > cf.log 2>&1 &
         
         sleep 12
-        cat cf.log
+        
+        # استخراج الرابط وتعديله ليقوم بالاتصال المباشر وتجنب خطأ الشاشة السوداء أو فشل الاتصال
+        URL=$(grep -o 'https://[^ ]*\.trycloudflare\.com' cf.log | head -n 1)
+        echo "===================================================="
+        echo "رابط الدخول المباشر للويندوز:"
+        echo "${URL}/vnc.html?autoconnect=1&resize=scale"
+        echo "===================================================="
 
     - name: إبقاء الجلسة نشطة
       run: |
