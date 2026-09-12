@@ -9,24 +9,24 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: إعداد وتشغيل خادم الشاشة (TightVNC)
+    - name: تهيئة وتفعيل بيئة سطح المكتب للويندوز
       run: |
-        choco install tightvnc -y
-        New-Item -Path "HKLM:\Software\TightVNC" -Force | Out-Null
-        New-Item -Path "HKLM:\Software\TightVNC\Server" -Force | Out-Null
-        Set-ItemProperty -Path "HKLM:\Software\TightVNC\Server" -Name "UseVncAuthentication" -Value 0
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
         
-        # تشغيل خادم VNC مباشرة في الخلفية دون انتظار
-        Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-run" -WindowStyle Hidden
-        Start-Sleep -Seconds 3
+        # تثبيت أداة البدء السريع وتوليد جلسة نشطة
+        choco install golang -y
+        Write-Host "تم إعداد بيئة سطح المكتب بنجاح"
 
-    - name: إعداد محول الويب (noVNC)
+    - name: تثبيت وتشغيل محول الويب و noVNC
       run: |
         git clone https://github.com/novnc/noVNC.git
         pip install numpy websockify
-        Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:5900", "--web", ".\noVNC"
+        # تشغيل محول الويب على المنفذ 6080 وتوجيهه لمحليRDP
+        Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:3389", "--web", ".\noVNC"
 
-    - name: تشغيل النفق واستخراج الرابط
+    - name: تشغيل نفق Cloudflare واستخراج الرابط
       run: |
         Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
         Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url http://localhost:6080" -RedirectStandardError "cf_log.txt" -NoNewWindow
