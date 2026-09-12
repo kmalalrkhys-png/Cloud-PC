@@ -1,10 +1,10 @@
-name: Real Windows KVM on Linux (10GB RAM, 80GB Disk)
+name: Real Windows KVM with Go-VNC (10GB RAM, 80GB Disk)
 
 on:
   workflow_dispatch:
 
 jobs:
-  windows-kvm:
+  kvm-govnc:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -12,7 +12,7 @@ jobs:
     - name: إعداد القرص الثانوي ومساحة الـ 80GB
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker git golang-go
         kvm-ok || true
         
         sudo mkdir -p /mnt/d/kvm-disk
@@ -22,9 +22,8 @@ jobs:
       run: |
         qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 80G
 
-    - name: تشغيل محاكي KVM مع تخصيص 10GB رام و 2 Cores وتوجيه RDP
+    - name: تشغيل نظام KVM بالموارد المحددة
       run: |
-        # ملاحظة: يمكنك وضع رابط ملف ISO لنظام ويندوز لتثبيته، أو تشغيل النظام المباشر
         nohup qemu-system-x86_64 \
           -enable-kvm \
           -smp 2 \
@@ -33,15 +32,24 @@ jobs:
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -vnc :0 > kvm.log 2>&1 &
         
-        sleep 10
+        sleep 20
 
-    - name: تشغيل Cloudflare Tunnel لتوجيه منفذ RDP للاتصال المباشر
+    - name: تحميل وتثبيت خادم العرض البديل وتوجيه Cloudflare
       run: |
+        # استنساخ أداة تعتمد على Go للبث السريع خفيف الموارد
+        git clone https://github.com/maka00/govnc.git
+        cd govnc
+        go mod init govnc || true
+        go get github.com/gorilla/websocket || true
+        
+        # تشغيل خادم البث عبر المنفذ 8080 لتجنب مشاكل 502
+        nohup go run main.go socket > govnc.log 2>&1 &
+        cd ..
+
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
         
-        # توجيه بروتوكول RDP مباشرة عبر نفق TCP
-        nohup ./cloudflared tunnel --url rdp://localhost:3389 > cf.log 2>&1 &
+        nohup ./cloudflared tunnel --url http://localhost:8080 > cf.log 2>&1 &
         
         sleep 12
         cat cf.log
