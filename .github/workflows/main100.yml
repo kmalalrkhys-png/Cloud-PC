@@ -9,13 +9,19 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: إعداد خادم الشاشة (TightVNC) عبر Choco
+    - name: إعداد خادم الشاشة (TightVNC) وضمان تشغيله
       run: |
         choco install tightvnc -y
         New-Item -Path "HKLM:\Software\TightVNC" -Force | Out-Null
         New-Item -Path "HKLM:\Software\TightVNC\Server" -Force | Out-Null
         Set-ItemProperty -Path "HKLM:\Software\TightVNC\Server" -Name "UseVncAuthentication" -Value 0
+        
+        # إعادة تشغيل خدمة VNC لضمان التقاط الشاشة الافتراضية للويندوز
+        Stop-Process -Name "tvnserver" -Force -ErrorAction SilentlyContinue
+        Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-controlservice -stop" -Wait
+        Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-reinstall" -Wait
         Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-run"
+        Start-Sleep -Seconds 3
 
     - name: إعداد محول الويب (noVNC)
       run: |
