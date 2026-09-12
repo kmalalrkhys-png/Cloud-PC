@@ -9,34 +9,33 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: تفعيل إعدادات الاتصال السريع للويندوز
+    - name: تفعيل إعدادات الاتصال للويندوز
       run: |
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
-        Write-Host "تم تفعيل الاتصال بنجاح"
 
-    - name: تثبيت محول الويب noVNC
+    - name: تثبيت وتشغيل محول الويب noVNC
       run: |
         git clone https://github.com/novnc/noVNC.git
         pip install numpy websockify
         Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:3389", "--web", ".\noVNC"
 
-    - name: تشغيل نفق Cloudflare واستخراج الرابط
+    - name: تحميل وتشغيل نفق Cloudflare بشكل مباشر
       run: |
         Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
-        Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url http://localhost:6080" -RedirectStandardError "cf_log.txt" -NoNewWindow
         
-        Start-Sleep -Seconds 10
+        # تشغيل النفق وإظهار الرابط مباشرة في السجل بشكل دائم
+        Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url http://localhost:6080" -NoNewWindow
         
-        $url = Select-String -Path "cf_log.txt" -Pattern "https://[a-z0-9-]+\.trycloudflare\.com" | ForEach-Object { $_.Matches.Value }
+        # إعطاء وقت كافٍ لظهور الرابط
+        Start-Sleep -Seconds 15
         
         Write-Host "=========================================="
-        Write-Host "✅ تم الاتصال بنجاح!"
-        Write-Host "👉 افتح هذا الرابط في متصفح هاتفك:"
-        Write-Host "$($url)/vnc.html"
+        Write-Host "✅ السيرفر يعمل الآن!"
+        Write-Host "👉 ابحث في سطر الأوامر أعلاه عن رابط trycloudflare.com وافتحه"
         Write-Host "=========================================="
 
-    - name: إبقاء الجلسة نشطة
+    - name: إبقاء الجلسة نشطة لمنع انقطاع النفق
       run: |
         while ($true) { Start-Sleep -Seconds 60 }
