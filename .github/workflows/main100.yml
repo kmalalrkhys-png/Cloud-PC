@@ -27,16 +27,17 @@ jobs:
         pip3 install numpy websockify
         git clone https://github.com/novnc/noVNC.git
 
-    - name: تشغيل ويندوز عبر KVM (2 Cores - 10GB RAM)
+    - name: تشغيل ويندوز عبر KVM والانتظار لضمان الإقلاع
       run: |
         nohup qemu-system-x86_64 -smp 2 -m 10240 -drive file=/mnt/d/kvm-disk/win-hd.qcow2,format=qcow2,if=virtio -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 -vnc :0 -enable-kvm > kvm.log 2>&1 &
+        
+        # الانتظار 15 ثانية لضمان استقرار الخادم وفتح المنفذ 5900
+        sleep 15
 
-    - name: تشغيل جسر noVNC على المنفذ 6080 وتوجيه Cloudflare
+    - name: تشغيل جسر noVNC و Cloudflare Tunnel
       run: |
-        # تشغيل الجسر بـ python مباشرة لضمان عدم التوقف
         nohup python3 -m websockify --web ./noVNC 6080 localhost:5900 > novnc.log 2>&1 &
         
-        # تحميل وتشغيل Cloudflare Tunnel
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
         nohup ./cloudflared tunnel --url http://localhost:6080 > cf.log 2>&1 &
