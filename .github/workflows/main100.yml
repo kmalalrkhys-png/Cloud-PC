@@ -9,22 +9,23 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: تهيئة وتفعيل بيئة سطح المكتب للويندوز
+    - name: تثبيت وتشغيل TightVNC الشاشة البصرية
       run: |
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
+        choco install tightvnc -y
+        New-Item -Path "HKLM:\Software\TightVNC" -Force | Out-Null
+        New-Item -Path "HKLM:\Software\TightVNC\Server" -Force | Out-Null
+        Set-ItemProperty -Path "HKLM:\Software\TightVNC\Server" -Name "UseVncAuthentication" -Value 0
         
-        # تثبيت أداة البدء السريع وتوليد جلسة نشطة
-        choco install golang -y
-        Write-Host "تم إعداد بيئة سطح المكتب بنجاح"
+        # إنشاء مفتاح لتشغيل شاشة وهمية وتفعيل الخادم بصلاحيات كاملة
+        Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-reinstall" -Wait
+        Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-run"
+        Start-Sleep -Seconds 5
 
-    - name: تثبيت وتشغيل محول الويب و noVNC
+    - name: تثبيت محول الويب noVNC
       run: |
         git clone https://github.com/novnc/noVNC.git
         pip install numpy websockify
-        # تشغيل محول الويب على المنفذ 6080 وتوجيهه لمحليRDP
-        Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:3389", "--web", ".\noVNC"
+        Start-Process -NoNewWindow -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:5900", "--web", ".\noVNC"
 
     - name: تشغيل نفق Cloudflare واستخراج الرابط
       run: |
@@ -43,5 +44,4 @@ jobs:
 
     - name: إبقاء الجلسة نشطة
       run: |
-        Write-Host "السيرفر يعمل الآن... الجلسة ستستمر طالما هذا الإجراء قيد التشغيل."
         while ($true) { Start-Sleep -Seconds 60 }
