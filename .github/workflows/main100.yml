@@ -1,10 +1,10 @@
-name: Real Windows KVM with Web VNC (10GB RAM, 80GB Disk)
+name: Real Windows KVM with Tailscale (10GB RAM, 80GB Disk)
 
 on:
   workflow_dispatch:
 
 jobs:
-  kvm-webvnc:
+  kvm-tailscale:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -12,7 +12,7 @@ jobs:
     - name: إعداد القرص الثانوي ومساحة الـ 80GB
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker python3-pip python3-venv git
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker python3-pip python3-venv git curl
         kvm-ok || true
         
         sudo mkdir -p /mnt/d/kvm-disk
@@ -24,7 +24,19 @@ jobs:
         git clone https://github.com/novnc/noVNC.git
         ln -s vnc.html noVNC/index.html
 
-    - name: تشغيل نظام KVM وجسر الويب عبر بيئة بايثون المعزولة
+    - name: تثبيت وتشغيل Tailscale تلقائياً
+      run: |
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.src | sudo tee /etc/apt/sources.list.d/tailscale.list >/dev/null
+        sudo apt-get update
+        sudo apt-get install -y tailscale
+        
+        sudo tailscaled &
+        sleep 3
+        # سحب المفتاح تلقائياً من إعدادات الـ Secrets بدون أن يطلب منك كود
+        sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=github-windows-kvm
+
+    - name: تشغيل نظام KVM وجسر الويب المحلي
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -40,22 +52,10 @@ jobs:
         ./venv/bin/pip install websockify
         
         nohup ./venv/bin/websockify --web ./noVNC 6080 localhost:5900 > novnc.log 2>&1 &
-        sleep 5
-
-    - name: تشغيل Cloudflare Tunnel لتوجيه الرابط
-      run: |
-        curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-        chmod +x cloudflared
         
-        nohup ./cloudflared tunnel --url http://localhost:6080 > cf.log 2>&1 &
-        
-        sleep 12
-        
-        # استخراج الرابط وتعديله ليقوم بالاتصال المباشر وتجنب خطأ الشاشة السوداء أو فشل الاتصال
-        URL=$(grep -o 'https://[^ ]*\.trycloudflare\.com' cf.log | head -n 1)
         echo "===================================================="
-        echo "رابط الدخول المباشر للويندوز:"
-        echo "${URL}/vnc.html?autoconnect=1&resize=scale"
+        echo "تم التشغيل بنجاح عبر Tailscale تلقائياً!"
+        echo "http://<Tailscale-IP>:6080/vnc.html?autoconnect=1&resize=scale"
         echo "===================================================="
 
     - name: إبقاء الجلسة نشطة
