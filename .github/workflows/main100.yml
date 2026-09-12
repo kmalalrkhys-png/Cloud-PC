@@ -9,11 +9,9 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: إعداد خادم الشاشة (TightVNC)
+    - name: إعداد خادم الشاشة (TightVNC) عبر Choco
       run: |
-        Invoke-WebRequest -Uri "https://www.tightvnc.com/download/2.8.81/tvnc64-2.8.81-gpl-setup.msi" -OutFile "tvnc.msi"
-        Start-Process msiexec.exe -ArgumentList "/i tvnc.msi /quiet /norestart" -Wait
-        # تعطيل كلمة المرور لتسهيل الدخول من الهاتف
+        choco install tightvnc -y
         New-Item -Path "HKLM:\Software\TightVNC" -Force | Out-Null
         New-Item -Path "HKLM:\Software\TightVNC\Server" -Force | Out-Null
         Set-ItemProperty -Path "HKLM:\Software\TightVNC\Server" -Name "UseVncAuthentication" -Value 0
@@ -30,7 +28,7 @@ jobs:
       run: |
         Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe"
         Start-Process -FilePath ".\cloudflared.exe" -ArgumentList "tunnel --url http://localhost:6080" -RedirectStandardError "cf_log.txt" -NoNewWindow
-        Start-Sleep -Seconds 10
+        Start-Sleep -Seconds 12
         $url = Select-String -Path "cf_log.txt" -Pattern "https://[a-z0-9-]+\.trycloudflare\.com" | ForEach-Object { $_.Matches.Value }
         
         Write-Host "=========================================="
