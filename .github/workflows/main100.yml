@@ -24,16 +24,15 @@ jobs:
         git clone https://github.com/novnc/noVNC.git
         ln -s vnc.html noVNC/index.html
 
-    - name: تثبيت وتشغيل Tailscale تلقائياً
+    - name: تثبيت وتشغيل Tailscale بالطريقة الرسمية السريعة
       run: |
-        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.src | sudo tee /etc/apt/sources.list.d/tailscale.list >/dev/null
-        sudo apt-get update
-        sudo apt-get install -y tailscale
+        # استخدام السكريبت الرسمي المباشر من Tailscale لتجنب مشاكل الروابط
+        curl -fsSL https://tailscale.com/install.sh | sh
         
         sudo tailscaled &
         sleep 3
-        # سحب المفتاح تلقائياً من إعدادات الـ Secrets بدون أن يطلب منك كود
+        
+        # الاتصال باستخدام المفتاح المخزن في Secrets
         sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=github-windows-kvm
 
     - name: تشغيل نظام KVM وجسر الويب المحلي
@@ -54,7 +53,7 @@ jobs:
         nohup ./venv/bin/websockify --web ./noVNC 6080 localhost:5900 > novnc.log 2>&1 &
         
         echo "===================================================="
-        echo "تم التشغيل بنجاح عبر Tailscale تلقائياً!"
+        echo "تم التشغيل بنجاح عبر Tailscale!"
         echo "http://<Tailscale-IP>:6080/vnc.html?autoconnect=1&resize=scale"
         echo "===================================================="
 
