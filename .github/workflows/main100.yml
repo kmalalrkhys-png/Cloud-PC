@@ -54,7 +54,9 @@ jobs:
         
         # تشغيل نفق Cloudflare
         cloudflared tunnel --url http://localhost:6080 --logfile tunnel.log &
-        sleep 6
+        
+        # الانتظار 10 ثوانٍ لضمان تفعيل النفق واستقرار الرابط تماماً
+        sleep 10
         
         TUNNEL_URL=$(grep -o 'https://[-0-9a-z]*\.trycloudflare.com' tunnel.log | head -n 1)
         
