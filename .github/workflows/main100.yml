@@ -21,11 +21,10 @@ jobs:
       run: |
         qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 100G
 
-    - name: تحميل نسخة ويندوز 11 الخام بأقصى سرعة
+    - name: تحميل نسخة ويندوز 11 الخام بأقصى سرعة للسيرفر
       run: |
-        echo "جاري التحميل بأقصى سرعة عبر سيرفرات التوزيع السريعة..."
-        # ضع رابط التحميل المباشر الحقيقي لملف الـ ISO بين القوسين أدناه
-        aria2c -x 16 -s 16 -o win.iso "ضع_رابط_التحميل_المباشر_هنا"
+        echo "جاري التحميل بأقصى سرعة استغلالاً لسرعة سيرفرات GitHub..."
+        aria2c -x 16 -s 16 -o win.iso "https://archive.org/download/win-11-25h2-pro-ar/Win11_25H2_Arabic.iso"
 
     - name: تشغيل نظام KVM وربط البورت 3389
       run: |
