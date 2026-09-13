@@ -26,13 +26,11 @@ jobs:
 
     - name: تثبيت وتشغيل Tailscale بالطريقة الرسمية السريعة
       run: |
-        # استخدام السكريبت الرسمي المباشر من Tailscale لتجنب مشاكل الروابط
         curl -fsSL https://tailscale.com/install.sh | sh
         
         sudo tailscaled &
         sleep 3
         
-        # الاتصال باستخدام المفتاح المخزن في Secrets
         sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=github-windows-kvm
 
     - name: تشغيل نظام KVM وجسر الويب المحلي
@@ -50,11 +48,13 @@ jobs:
         python3 -m venv venv
         ./venv/bin/pip install websockify
         
-        nohup ./venv/bin/websockify --web ./noVNC 6080 localhost:5900 > novnc.log 2>&1 &
+        # ربط الـ websockify ليكون متاحاً عبر شبكة Tailscale بشكل مباشر
+        nohup ./venv/bin/websockify --web ./noVNC 0.0.0.0:6080 127.0.0.1:5900 > novnc.log 2>&1 &
         
         echo "===================================================="
         echo "تم التشغيل بنجاح عبر Tailscale!"
-        echo "http://<Tailscale-IP>:6080/vnc.html?autoconnect=1&resize=scale"
+        echo "رابط الدخول عبر المتصفح:"
+        echo "http://100.103.102.6:6080/vnc.html?autoconnect=1&resize=scale"
         echo "===================================================="
 
     - name: إبقاء الجلسة نشطة
