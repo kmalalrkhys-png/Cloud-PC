@@ -9,13 +9,21 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: إعداد القرص والأدوات المتطورة
+    - name: إعداد القرص والأدوات
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client tomcat9 guacamole guacd libguac-client-vnc
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client
+        
+        # تحميل أداة Gotty المتطورة كبديل ويب خفيف وسريع جداً
+        curl -L --output gotty.tar.gz https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_v1.0.1_linux_amd64.tar.gz
+        tar xzf gotty.tar.gz
+        sudo mv gotty /usr/local/bin/
+        
+        # تحميل أداة Cloudflare Tunnel
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
         sudo mv cloudflared /usr/local/bin/
+        
         kvm-ok || true
         sudo mkdir -p /mnt/d/kvm-disk
         sudo chown -R $USER:$USER /mnt/d/kvm-disk
@@ -29,7 +37,7 @@ jobs:
         echo "جاري تحميل النسخة الخام من سيرفرات مايكروسوفت بسرعة عالية..."
         aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
-    - name: تشغيل KVM وخدمة Guacamole المتطورة
+    - name: تشغيل KVM وواجهة التحكم المتطورة
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -41,18 +49,17 @@ jobs:
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -vnc 0.0.0.0:0 > kvm.log 2>&1 &
         
-        # تشغيل خدمة guacd البديلة والمتطورة
-        sudo systemctl start guacd
-        sudo systemctl start tomcat9
+        # تشغيل gotty لعرض شاشة الـ VNC أو التفاعل مباشرة
+        nohup gotty --port 8080 --permit-write --ws-origin "*" vncviewer localhost:5900 > gotty.log 2>&1 &
         
-        # تشغيل النفق على بورت Tomcat المحلي (8080)
+        # تشغيل النفق
         cloudflared tunnel --url http://localhost:8080 --logfile tunnel.log &
         sleep 5
         TUNNEL_URL=$(grep -o 'https://[-0-9a-z]*\.trycloudflare.com' tunnel.log | head -n 1)
         
         echo "===================================================="
-        echo "رابط البديل المتطور (Guacamole):"
-        echo "${TUNNEL_URL}/guacamole/"
+        echo "رابط البديل المتطور المباشر:"
+        echo "${TUNNEL_URL}"
         echo "===================================================="
 
     - name: إبقاء الجلسة نشطة
