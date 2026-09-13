@@ -9,14 +9,34 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: إعداد القرص والأدوات
+    - name: إعداد القرص وأدوات Guacamole
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client x11vnc xvfb
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client tomcat9 guacd libguac-client-vnc libguac-client-rdp
         
-        # تحميل أداة Gotty المباشرة والتنفيذية بدون أرشيف لتجنب الأخطاء
-        sudo curl -L -o /usr/local/bin/gotty https://github.com/sorenisanerd/gotty/releases/download/v1.5.0/gotty_v1.5.0_linux_amd64
-        sudo chmod +x /usr/local/bin/gotty
+        # تحميل حزمة ويب Guacamole الرسمية الجاهزة لتجنب التعقيد
+        sudo wget -O /var/lib/tomcat9/webapps/guacamole.war https://downloads.apache.org/guacamole/1.5.3/binary/guacamole-1.5.3.war
+        
+        # إنشاء مجلد الإعدادات لـ Guacamole
+        sudo mkdir -p /etc/guacamole
+        
+        # إنشاء ملف الربط والمصادقة (اسم المستخدم وكلمة المرور)
+        # اسم المستخدم هنا هو: admin
+        # كلمة المرور هنا هي: admin123 (يمكنك تغييرها كما ترغب)
+        sudo bash -c 'cat > /etc/guacamole/user-mapping.xml <<EOF
+        <user-mapping>
+            <authorize username="admin" password="admin123">
+                <connection name="Windows 11 KVM">
+                    <protocol>vnc</protocol>
+                    <param name="hostname">localhost</param>
+                    <param name="port">5900</param>
+                </connection>
+            </authorize>
+        </user-mapping>
+        EOF'
+        
+        # ربط ملف الإعدادات بـ Guacamole
+        sudo ln -s /etc/guacamole/user-mapping.xml /var/lib/tomcat9/conf/user-mapping.xml || true
         
         # تحميل أداة Cloudflare Tunnel
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
@@ -36,7 +56,7 @@ jobs:
         echo "جاري تحميل النسخة الخام من سيرفرات مايكروسوفت بسرعة عالية..."
         aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
-    - name: تشغيل KVM وواجهة التحكم المتطورة
+    - name: تشغيل KVM وخدمات Guacamole المتطورة
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -48,21 +68,23 @@ jobs:
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -vnc 0.0.0.0:0 > kvm.log 2>&1 &
         
-        # تشغيل شاشة افتراضية و x11vnc ثم ربطها بـ gotty
-        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-        export DISPLAY=:99
-        nohup x11vnc -display :99 -forever -shared > x11vnc.log 2>&1 &
+        # تشغيل خدمات guacd و tomcat
+        sudo systemctl start guacd
+        sudo systemctl start tomcat9
         
-        nohup gotty --port 8080 --permit-write --ws-origin "*" vncviewer localhost:5900 > gotty.log 2>&1 &
-        
-        # تشغيل النفق
+        # تشغيل نفق Cloudflare على بورت Tomcat (8080)
         cloudflared tunnel --url http://localhost:8080 --logfile tunnel.log &
-        sleep 5
+        sleep 6
+        
         TUNNEL_URL=$(grep -o 'https://[-0-9a-z]*\.trycloudflare.com' tunnel.log | head -n 1)
         
         echo "===================================================="
-        echo "رابط البديل المتطور المباشر:"
-        echo "${TUNNEL_URL}"
+        echo "رابط Guacamole المتطور:"
+        echo "${TUNNEL_URL}/guacamole/"
+        echo "----------------------------------------------------"
+        echo "بيانات تسجيل الدخول الافتراضية:"
+        echo "Username: admin"
+        echo "Password: admin123"
         echo "===================================================="
 
     - name: إبقاء الجلسة نشطة
