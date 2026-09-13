@@ -49,13 +49,14 @@ jobs:
         nohup websockify --web /usr/share/novnc/ 8080 127.0.0.1:5900 > websockify.log 2>&1 &
         
         cloudflared tunnel --url http://127.0.0.1:8080 --logfile tunnel.log &
-        sleep 10
+        sleep 12
         
         TUNNEL_URL=$(grep -o 'https://[-0-9a-z]*\.trycloudflare.com' tunnel.log | head -n 1)
+        DOMAIN=$(echo $TUNNEL_URL | sed 's|https://||')
         
         echo "===================================================="
         echo "رابط الـ VNC المباشر:"
-        echo "${TUNNEL_URL}/vnc.html?host=${TUNNEL_URL#https://}&port=443&path=&password=admin123&autoconnect=1&resize=scale"
+        echo "${TUNNEL_URL}/vnc.html?host=${DOMAIN}&port=443&path=&password=admin123&autoconnect=1&resize=scale"
         echo "----------------------------------------------------"
         echo "كلمة المرور: admin123"
         echo "===================================================="
