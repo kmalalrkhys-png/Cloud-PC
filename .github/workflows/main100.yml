@@ -26,7 +26,7 @@ jobs:
       run: |
         aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
-    - name: تشغيل نظام التشغيل وربط noVNC المحلي
+    - name: تشغيل النظام ونفق Pinggy
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -44,12 +44,15 @@ jobs:
         nohup x11vnc -display :0 -usepw -forever -shared -rfbport 5900 > x11vnc.log 2>&1 &
         nohup websockify --web /usr/share/novnc/ 6080 127.0.0.1:5900 > websockify.log 2>&1 &
 
-        # الحصول على الـ IP الخاص بجهاز GitHub Actions للوصول المباشر
-        PUBLIC_IP=$(curl -s ifconfig.me)
+        # تشغيل نفق Pinggy المجاني عبر SSH لتوليد رابط مباشر وثابت
+        nohup ssh -o StrictHostKeyChecking=no -R 80:localhost:6080 a.pinggy.io > pinggy.log 2>&1 &
+        sleep 8
+
+        PINGGY_URL=$(grep -o 'https://[-0-9a-z]*\.a.pinggy.link' pinggy.log | head -n 1)
         
         echo "===================================================="
-        echo "رابط noVNC المباشر:"
-        echo "http://${PUBLIC_IP}:6080/vnc.html?host=${PUBLIC_IP}&port=6080&password=admin123&autoconnect=1&resize=scale"
+        echo "رابط الـ VNC عبر Pinggy:"
+        echo "${PINGGY_URL}/vnc.html?host=${PINGGY_URL#https://}&port=443&path=&password=admin123&autoconnect=1&resize=scale"
         echo "----------------------------------------------------"
         echo "كلمة المرور: admin123"
         echo "===================================================="
