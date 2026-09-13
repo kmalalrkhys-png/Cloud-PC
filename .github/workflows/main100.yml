@@ -1,10 +1,10 @@
-name: Windows 11 25H2 Fast KVM RDP
+name: Windows 11 25H2 Arabic Direct KVM
 
 on:
   workflow_dispatch:
 
 jobs:
-  kvm-win11:
+  kvm-win11-official:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -21,10 +21,10 @@ jobs:
       run: |
         qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 100G
 
-    - name: تحميل نسخة ويندوز 11 الخام بأقصى سرعة للسيرفر
+    - name: تحميل نسخة ويندوز 11 الرسمية بأقصى سرعة من مايكروسوفت
       run: |
-        echo "جاري التحميل بأقصى سرعة استغلالاً لسرعة سيرفرات GitHub..."
-        aria2c -x 16 -s 16 -o win.iso "https://archive.org/download/win-11-25h2-pro-ar/Win11_25H2_Arabic.iso"
+        echo "جاري تحميل النسخة الخام من سيرفرات مايكروسوفت بسرعة عالية..."
+        aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
     - name: تشغيل نظام KVM وربط البورت 3389
       run: |
