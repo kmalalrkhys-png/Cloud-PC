@@ -32,7 +32,7 @@ jobs:
         echo "جاري تحميل النسخة الخام من سيرفرات مايكروسوفت بسرعة عالية..."
         aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
-    - name: تشغيل KVM وحماية الاتصال بكلمة مرور
+    - name: تشغيل KVM وربط noVNC بشكل صحيح
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -44,27 +44,29 @@ jobs:
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -vnc 0.0.0.0:0 > kvm.log 2>&1 &
         
-        # إنشاء كلمة مرور آمنة لـ VNC (كلمة المرور هنا هي: admin123)
+        # إنشاء كلمة مرور VNC
         mkdir -p ~/.vnc
         x11vnc -storepasswd admin123 ~/.vnc/passwd
         
-        # تشغيل خادم الحماية وتشغيل noVNC
+        # تشغيل خادم VNC
         nohup x11vnc -usepw -forever -shared -rfbport 5900 > x11vnc.log 2>&1 &
-        nohup websockify --web /usr/share/novnc/ 6080 localhost:5900 > websockify.log 2>&1 &
         
-        # تشغيل نفق Cloudflare
-        cloudflared tunnel --url http://localhost:6080 --logfile tunnel.log &
+        # تشغيل websockify على المنفذ 8080 وربطه بـ noVNC المحلي
+        nohup websockify --web /usr/share/novnc/ 8080 localhost:5900 > websockify.log 2>&1 &
         
-        # الانتظار 10 ثوانٍ لضمان تفعيل النفق واستقرار الرابط تماماً
+        # توجيه نفق Cloudflare إلى المنفذ 8080 المباشر
+        cloudflared tunnel --url http://localhost:8080 --logfile tunnel.log &
+        
+        # انتظار 10 ثوانٍ لضمان استقرار الاتصال
         sleep 10
         
         TUNNEL_URL=$(grep -o 'https://[-0-9a-z]*\.trycloudflare.com' tunnel.log | head -n 1)
         
         echo "===================================================="
-        echo "رابط الويندوز المحمي:"
+        echo "رابط الويندوز المباشر:"
         echo "${TUNNEL_URL}/vnc.html?autoconnect=1&resize=scale"
         echo "----------------------------------------------------"
-        echo "كلمة المرور المطلوبة للدخول (Password): admin123"
+        echo "كلمة المرور المطلوبة (Password): admin123"
         echo "===================================================="
 
     - name: إبقاء الجلسة نشطة
