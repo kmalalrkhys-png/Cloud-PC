@@ -44,15 +44,21 @@ jobs:
         nohup x11vnc -display :0 -usepw -forever -shared -rfbport 5900 > x11vnc.log 2>&1 &
         nohup websockify --web /usr/share/novnc/ 6080 127.0.0.1:5900 > websockify.log 2>&1 &
 
-        # تشغيل نفق Pinggy المجاني عبر SSH لتوليد رابط مباشر وثابت
-        nohup ssh -o StrictHostKeyChecking=no -R 80:localhost:6080 a.pinggy.io > pinggy.log 2>&1 &
-        sleep 8
+        # تشغيل نفق Pinggy المجاني
+        nohup ssh -o StrictHostKeyChecking=no -R 0:localhost:6080 a.pinggy.io > pinggy.log 2>&1 &
+        sleep 12
 
-        PINGGY_URL=$(grep -o 'https://[-0-9a-z]*\.a.pinggy.link' pinggy.log | head -n 1)
+        # استخراج الرابط بشكل صحيح وآمن
+        PINGGY_URL=$(grep -o 'https://[a-zA-Z0-9.-]*\.a.pinggy.link' pinggy.log | head -n 1)
+        if [ -z "$PINGGY_URL" ]; then
+          PINGGY_URL=$(cat pinggy.log | grep -o 'https://[^ ]*' | head -n 1)
+        fi
+        
+        HOST_DOM=$(echo $PINGGY_URL | sed 's|https://||')
         
         echo "===================================================="
         echo "رابط الـ VNC عبر Pinggy:"
-        echo "${PINGGY_URL}/vnc.html?host=${PINGGY_URL#https://}&port=443&path=&password=admin123&autoconnect=1&resize=scale"
+        echo "${PINGGY_URL}/vnc.html?host=${HOST_DOM}&port=443&path=&password=admin123&autoconnect=1&resize=scale"
         echo "----------------------------------------------------"
         echo "كلمة المرور: admin123"
         echo "===================================================="
