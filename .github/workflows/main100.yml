@@ -12,12 +12,11 @@ jobs:
     - name: إعداد القرص والأدوات
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client x11vnc xvfb
         
-        # تحميل أداة Gotty المتطورة كبديل ويب خفيف وسريع جداً
-        curl -L --output gotty.tar.gz https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_v1.0.1_linux_amd64.tar.gz
-        tar xzf gotty.tar.gz
-        sudo mv gotty /usr/local/bin/
+        # تحميل أداة Gotty المباشرة والتنفيذية بدون أرشيف لتجنب الأخطاء
+        sudo curl -L -o /usr/local/bin/gotty https://github.com/sorenisanerd/gotty/releases/download/v1.5.0/gotty_v1.5.0_linux_amd64
+        sudo chmod +x /usr/local/bin/gotty
         
         # تحميل أداة Cloudflare Tunnel
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
@@ -49,7 +48,11 @@ jobs:
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -vnc 0.0.0.0:0 > kvm.log 2>&1 &
         
-        # تشغيل gotty لعرض شاشة الـ VNC أو التفاعل مباشرة
+        # تشغيل شاشة افتراضية و x11vnc ثم ربطها بـ gotty
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        export DISPLAY=:99
+        nohup x11vnc -display :99 -forever -shared > x11vnc.log 2>&1 &
+        
         nohup gotty --port 8080 --permit-write --ws-origin "*" vncviewer localhost:5900 > gotty.log 2>&1 &
         
         # تشغيل النفق
