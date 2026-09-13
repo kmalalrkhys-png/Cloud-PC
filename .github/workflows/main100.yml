@@ -9,10 +9,10 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: إعداد النظام وخدمة Docker لـ Guacamole
+    - name: إعداد الأدوات الأساسية بدون تعارض
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client docker.io
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client
         
         # تحميل أداة Cloudflare Tunnel
         curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
@@ -32,7 +32,7 @@ jobs:
         echo "جاري تحميل النسخة الخام من سيرفرات مايكروسوفت بسرعة عالية..."
         aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
-    - name: تشغيل KVM و Guacamole المحمي بكلمة مرور
+    - name: تشغيل KVM و Guacamole المحمي
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -44,20 +44,19 @@ jobs:
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -vnc 0.0.0.0:0 > kvm.log 2>&1 &
         
-        # تشغيل Guacamole عبر Docker مع إعدادات جاهزة وبدون تعقيد الحزم
-        sudo docker run --name some-guacamole -p 8080:8080 -e VNC_HOST=localhost -e VNC_PORT=5900 -e GUACAMOLE_USERNAME=admin -e GUACAMOLE_PASSWORD=admin123 -d jasonrivers/ucse-guacamole
+        # تشغيل Guacamole مباشرة عبر داوكر النظام الجاهز
+        sudo docker run --name guac-win -p 8080:8080 -e VNC_HOST=localhost -e VNC_PORT=5900 -e GUACAMOLE_USERNAME=admin -e GUACAMOLE_PASSWORD=admin123 -d jasonrivers/ucse-guacamole
         
         # تشغيل نفق Cloudflare
         cloudflared tunnel --url http://localhost:8080 --logfile tunnel.log &
-        sleep 8
+        sleep 6
         
         TUNNEL_URL=$(grep -o 'https://[-0-9a-z]*\.trycloudflare.com' tunnel.log | head -n 1)
         
         echo "===================================================="
-        echo "رابط Guacamole المتطور:"
+        echo "رابط Guacamole المحمي:"
         echo "${TUNNEL_URL}"
         echo "----------------------------------------------------"
-        echo "بيانات تسجيل الدخول:"
         echo "Username: admin"
         echo "Password: admin123"
         echo "===================================================="
