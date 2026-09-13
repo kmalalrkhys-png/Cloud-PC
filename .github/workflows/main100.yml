@@ -9,14 +9,10 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: إعداد النظام وتشغيل KVM و VNC المباشر
+    - name: إعداد النظام وتشغيل KVM و noVNC
       run: |
         sudo apt-get update
         sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client novnc websockify x11vnc
-        
-        curl -L --output cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-        chmod +x cloudflared
-        sudo mv cloudflared /usr/local/bin/
         
         kvm-ok || true
         sudo mkdir -p /mnt/d/kvm-disk
@@ -30,7 +26,7 @@ jobs:
       run: |
         aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
-    - name: تشغيل النظام وضبط الاتصال المباشر
+    - name: تشغيل نظام التشغيل وربط noVNC المحلي
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -46,17 +42,14 @@ jobs:
         x11vnc -storepasswd admin123 ~/.vnc/passwd
         
         nohup x11vnc -display :0 -usepw -forever -shared -rfbport 5900 > x11vnc.log 2>&1 &
-        nohup websockify --web /usr/share/novnc/ 8080 127.0.0.1:5900 > websockify.log 2>&1 &
-        
-        cloudflared tunnel --url http://127.0.0.1:8080 --logfile tunnel.log &
-        sleep 12
-        
-        TUNNEL_URL=$(grep -o 'https://[-0-9a-z]*\.trycloudflare.com' tunnel.log | head -n 1)
-        DOMAIN=$(echo $TUNNEL_URL | sed 's|https://||')
+        nohup websockify --web /usr/share/novnc/ 6080 127.0.0.1:5900 > websockify.log 2>&1 &
+
+        # الحصول على الـ IP الخاص بجهاز GitHub Actions للوصول المباشر
+        PUBLIC_IP=$(curl -s ifconfig.me)
         
         echo "===================================================="
-        echo "رابط الـ VNC المباشر:"
-        echo "${TUNNEL_URL}/vnc.html?host=${DOMAIN}&port=443&path=&password=admin123&autoconnect=1&resize=scale"
+        echo "رابط noVNC المباشر:"
+        echo "http://${PUBLIC_IP}:6080/vnc.html?host=${PUBLIC_IP}&port=6080&password=admin123&autoconnect=1&resize=scale"
         echo "----------------------------------------------------"
         echo "كلمة المرور: admin123"
         echo "===================================================="
