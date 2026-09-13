@@ -1,10 +1,10 @@
-name: KVM Direct Port 3389
+name: Windows 11 25H2 KVM Direct Port 3389 (Arabic)
 
 on:
   workflow_dispatch:
 
 jobs:
-  kvm-rdp:
+  kvm-windows11-25h2:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -12,32 +12,37 @@ jobs:
     - name: إعداد القرص والأدوات
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl npm
         kvm-ok || true
         sudo mkdir -p /mnt/d/kvm-disk
         sudo chown -R $USER:$USER /mnt/d/kvm-disk
 
-    - name: بناء قرص 100GB
+    - name: بناء قرص 100GB سريع
       run: |
         qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 100G
 
-    - name: تثبيت أداة PortForwarding لتوجيه المنفذ 3389
+    - name: تحميل نسخة ويندوز 11 25H2 الرسمية (عربي)
       run: |
-        curl -L --output serveo https://github.com/anderspitman/tunnelto/releases/download/0.1.4/tunnelto-linux-amd64 || true
-        # سنعتمد على تفعيل المنفذ المباشر عبر SSH/LocalTunnel أو خيار مباشر
+        echo "جاري تحميل نسخة ويندوز 11 إصدار 25H2 العربية..."
+        curl -L -o win.iso "https://archive.org/download/Win11_25H2_Arabic_x64/Win11_25H2_Arabic_x64.iso"
 
-    - name: تشغيل نظام KVM وتوجيه البورت 3389
+    - name: تشغيل نظام KVM وربط البورت 3389
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
-          -smp 2 \
+          -smp 4 \
           -m 10240 \
           -drive file=/mnt/d/kvm-disk/win-hd.qcow2,format=qcow2,if=virtio,cache=none,aio=native \
+          -cdrom win.iso \
+          -boot d \
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -nographic > kvm.log 2>&1 &
         
-        # استخدام LocalTunnel لتصدير البورت 3389 مباشرة بدون تعقيد
         sudo npm install -g localtunnel
+        
+        echo "===================================================="
+        echo "جاري تشغيل توجيه المنفذ 3389 لويندوز 11 (25H2)..."
+        echo "===================================================="
         lt --port 3389 &
 
     - name: إبقاء الجلسة نشطة
