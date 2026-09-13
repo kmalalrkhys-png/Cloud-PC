@@ -26,7 +26,7 @@ jobs:
         echo "جاري تحميل النسخة الخام من سيرفرات مايكروسوفت بسرعة عالية..."
         aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
-    - name: تشغيل نظام KVM وتصدير البورتات عبر Pinggy TCP
+    - name: تشغيل نظام KVM وتصدير البورتات عبر Pinggy المباشر
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -39,12 +39,12 @@ jobs:
           -vnc 0.0.0.0:0 > kvm.log 2>&1 &
         
         echo "===================================================="
-        echo "تشغيل نفق RDP (البورت 3389):"
-        ssh -o StrictHostKeyChecking=no -p 80 -R 0:localhost:3389 tcp.pinggy.io
+        echo "رابط نفق RDP (البورت 3389):"
+        ssh -o StrictHostKeyChecking=no -p 80 -R 0:localhost:3389 -o ServerAliveInterval=30 a.pinggy.io &
         
         echo "===================================================="
-        echo "تشغيل نفق VNC (البورت 5900):"
-        ssh -o StrictHostKeyChecking=no -p 80 -R 0:localhost:5900 tcp.pinggy.io
+        echo "رابط نفق VNC لشاشة التثبيت (البورت 5900):"
+        ssh -o StrictHostKeyChecking=no -p 80 -R 0:localhost:5900 -o ServerAliveInterval=30 a.pinggy.io &
         echo "===================================================="
 
     - name: إبقاء الجلسة نشطة
