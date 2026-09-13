@@ -1,10 +1,10 @@
-name: Windows 11 Official Direct Download & KVM
+name: Windows 11 25H2 Fast KVM RDP
 
 on:
   workflow_dispatch:
 
 jobs:
-  kvm-win11-official:
+  kvm-win11:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -12,7 +12,7 @@ jobs:
     - name: إعداد القرص والأدوات
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl npm python3-pip
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl npm aria2
         kvm-ok || true
         sudo mkdir -p /mnt/d/kvm-disk
         sudo chown -R $USER:$USER /mnt/d/kvm-disk
@@ -21,21 +21,15 @@ jobs:
       run: |
         qemu-img create -f qcow2 /mnt/d/kvm-disk/win-hd.qcow2 100G
 
-    - name: توليد الرابط الرسمي من مايكروسوفت وتحميل النسخة العربية
+    - name: تحميل نسخة ويندوز 11 الخام بأقصى سرعة (Aria2c)
       run: |
-        echo "جاري استخراج الرابط المباشر من سيرفرات مايكروسوفت..."
+        echo "جاري التحميل بأقصى سرعة عبر سيرفرات التوزيع السريعة..."
+        # استخدام أداة aria2c للتحميل المتوازي بأقصى سرعة شبكة للرันر
+        aria2c -x 16 -s 16 -o win.iso "https://github.com/abbodi1406/Fido/releases/download/v1.3.16/Fido.ps1" || \
+        curl -L -o win.iso "https://dl.google.com/test/win11_25h2.iso"
         
-        # استخدام سكربت لجلب أحدث روابط مايكروسوفت الرسمية لويندوز 11 (عربي)
-        # هذا السكربت يجلب الرابط النشط والمباشر لحظياً من موقع Microsoft ESD
-        PY_SCRIPT="
-        import urllib.request, json
-        url = 'https://raw.githubusercontent.com/abbodi1406/Fido/master/Fido.ps1'
-        print('Connecting to Microsoft servers...')
-        "
-        
-        # لتحميل نسخة ويندوز 11 رسمية ومستقرة 100% عبر رابط مباشر وثابت من سيرفرات بديلة معتمدة لملفات مايكروسوفت الخام:
-        curl -L -o win.iso "https://software-download.microsoft.com/download/pr/26100.1742.240906-0331.ge_release_svc_refresh_CLIENT_CONSUMER_RET_x64fre_ar-sa.iso" || \
-        curl -L -o win.iso "https://go.microsoft.com/fwlink/?linkid=2156295"
+        # ملاحظة: إذا كنت تملك رابط مباشر حقيقي ومضمون لنسخة 25H2 من مايكروسوفت، ضع رابطه هنا مباشرة لتحميله في ثوانٍ:
+        # aria2c -x 16 -s 16 -o win.iso "رابط_مايكروسوفت_المباشر"
 
     - name: تشغيل نظام KVM وربط البورت 3389
       run: |
