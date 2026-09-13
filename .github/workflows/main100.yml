@@ -9,11 +9,19 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: إعداد النظام وتشغيل KVM و noVNC
+    - name: إعداد النظام وتشغيل KVM
       run: |
         sudo apt-get update
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-client novnc websockify x11vnc
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker curl aria2 openssh-server
         
+        # تفعيل وصيانة خدمة SSH للسيرفر
+        sudo systemctl enable --now ssh
+        echo "root:admin123" | sudo chpasswd
+        sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /ush/local/etc/sshd_config || true
+        sudo sed -i 's/#PermitRootLogin yes/PermitRootLogin yes/' /etc/ssh/sshd_config
+        sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+        sudo systemctl restart ssh
+
         kvm-ok || true
         sudo mkdir -p /mnt/d/kvm-disk
         sudo chown -R $USER:$USER /mnt/d/kvm-disk
@@ -26,7 +34,7 @@ jobs:
       run: |
         aria2c -x 16 -s 16 -o win.iso "https://software.download.prss.microsoft.com/dbazure/Win11_25H2_Arabic_x64_v2.iso?t=bf5ffea6-2935-464c-a816-d43905c4788f&P1=1789347942&P2=602&P3=2&P4=u%2fcANJaP9GL4R8HJQ7uKQLAYhOmMogIg1n5%2fjbHwSJFujPW7KCFOeCVnN6DQmsDhwTFA7Nm%2bG2R2ov664nCa77Gd2lyYV9E7RYy%2flY%2fLxq%2bCl1Bn65dLQbOksjUqEehLD%2fGdx1JtczVzEI5ns0wF8y5PVCLvNEy8Jc0RQRzJLa95vhKDlZ8avHdG%2f0bjURmGpOpw0E%2b64LROdVFmYS103YPu6Shye6vJAxcGmFTEBrB%2f3IaN09HOIvfe0qC6vDaR29SAyKjaAujmAfskxOVrzrob9mzfcmSdexYe%2fLQSO3Q2Jizz7ymbWd%2fgjE5TnPElLlDjLseyDElCM%2bXrCtqj0Q%3d%3d"
 
-    - name: تشغيل النظام ونفق Pinggy
+    - name: تشغيل النظام ونفق SSH المباشر عبر Pinggy
       run: |
         nohup qemu-system-x86_64 \
           -enable-kvm \
@@ -37,29 +45,16 @@ jobs:
           -boot d \
           -net nic,model=virtio -net user,hostfwd=tcp::3389-:3389 \
           -vnc 127.0.0.1:0 > kvm.log 2>&1 &
-        
-        mkdir -p ~/.vnc
-        x11vnc -storepasswd admin123 ~/.vnc/passwd
-        
-        nohup x11vnc -display :0 -usepw -forever -shared -rfbport 5900 > x11vnc.log 2>&1 &
-        nohup websockify --web /usr/share/novnc/ 6080 127.0.0.1:5900 > websockify.log 2>&1 &
 
-        # تشغيل نفق Pinggy المجاني
-        nohup ssh -o StrictHostKeyChecking=no -R 0:localhost:6080 a.pinggy.io > pinggy.log 2>&1 &
+        # فتح نفق مباشر لخدمة الـ SSH المحلية (منفذ 22) عبر Pinggy
+        nohup ssh -o StrictHostKeyChecking=no -R 0:localhost:22 a.pinggy.io > pinggy_ssh.log 2>&1 &
         sleep 12
 
-        # استخراج الرابط بشكل صحيح وآمن
-        PINGGY_URL=$(grep -o 'https://[a-zA-Z0-9.-]*\.a.pinggy.link' pinggy.log | head -n 1)
-        if [ -z "$PINGGY_URL" ]; then
-          PINGGY_URL=$(cat pinggy.log | grep -o 'https://[^ ]*' | head -n 1)
-        fi
-        
-        HOST_DOM=$(echo $PINGGY_URL | sed 's|https://||')
-        
         echo "===================================================="
-        echo "رابط الـ VNC عبر Pinggy:"
-        echo "${PINGGY_URL}/vnc.html?host=${HOST_DOM}&port=443&path=&password=admin123&autoconnect=1&resize=scale"
+        echo "تفاصيل الاتصال عبر SSH:"
+        cat pinggy_ssh.log
         echo "----------------------------------------------------"
+        echo "اسم المستخدم: root"
         echo "كلمة المرور: admin123"
         echo "===================================================="
 
